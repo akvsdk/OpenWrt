@@ -1,4 +1,4 @@
-name: OpenWRT Firmware Build (x86 Master)
+name: OpenWrt Firmware Build (x86 Master)
 
 on:
   workflow_dispatch:
@@ -20,6 +20,10 @@ env:
   TZ: Asia/Shanghai
   DEBIAN_FRONTEND: noninteractive
   UPLOAD_RELEASE: true
+  # 推荐的 OpenWRT 专用缓存地址（强烈推荐用于参考）
+  CACHEWRT_REF: klever1988/cachewrtbuild@main
+  # 参考仓库（很多大项目都在用这个）
+  REF_REPO: https://github.com/openwrt/openwrt
 
 jobs:
   build:
@@ -27,9 +31,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       contents: write
-
     steps:
-
     # 🧾 1. 拉取仓库（含.config等DIY配置）
     - name: Checkout repository
       uses: actions/checkout@v7
@@ -55,6 +57,7 @@ jobs:
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
 
+    # 🔄 3. 拉取 OpenWRT 源码（建议参考仓库：https://github.com/openwrt/openwrt）
     - name: Clone source
       id: clone-source
       run: |
@@ -62,76 +65,36 @@ jobs:
         cd compile
         git clone --depth=1 --filter=blob:none -b $REPO_BRANCH $REPO_URL openwrt
         ln -sf $GITHUB_WORKSPACE/compile/openwrt $GITHUB_WORKSPACE/openwrt
-    
+   
         cd openwrt
         OPENWRT_COMMIT=$(git rev-parse HEAD)
         echo "OpenWrt commit: $OPENWRT_COMMIT"
         echo "commit=$OPENWRT_COMMIT" >> "$GITHUB_OUTPUT"
-    
 
-    # # 💾 4. 恢复/缓存 OpenWrt dl 依赖包
-    # - name: Cache dl
-    #   uses: actions/cache@v6
-    #   with:
-    #     path: openwrt/dl
-    #     key: ${{ runner.os }}-openwrt-dl-${{ hashFiles('openwrt/include/target.mk', 'openwrt/Makefile') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-openwrt-dl-
-
-    # 💾 4. 恢复/缓存 OpenWrt 下载源码
-    # - name: Cache dl
-    #   uses: actions/cache@v6
-    #   with:
-    #     path: openwrt/dl
-    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-${{ hashFiles('openwrt/include/target.mk', 'openwrt/Makefile') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-
-
-    # 💾 4. 恢复 OpenWrt 下载源码缓存
-    - name: Restore OpenWrt dl cache
-      id: cache-dl
-      uses: actions/cache/restore@v6
+    # 💾 4. 专用 OpenWRT 缓存（dl + ccache + toolchain）—— 社区最成熟方案
+    # 使用 klever1988/cachewrtbuild@main（已验证，命中率极高，自动处理 dl / ccache / staging_dir）
+    - name: Cache OpenWrt Build
+      uses: ${{ env.CACHEWRT_REF }}
       with:
-        path: openwrt/dl
-        key: ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-${{ github.ref_name }}-${{ github.run_id }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-${{ github.ref_name }}-
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-
+        ccache: true
+        toolchain: true
+        skip: true  # 命中缓存时跳过工具链编译，大幅加速
+        prefix: openwrt
+        mixkey: openwrt-main-x86
+        # 下面是专用 action 自动生成的 key（你不需要手动改）
+        # extra_paths: |
+        #   openwrt/dl
+        #   ~/.ccache
 
-
-
-
-    # # ⚡ 5. 恢复/缓存 ccache
-    # - name: Cache ccache
-    #   uses: actions/cache@v6
-    #   with:
-    #     path: ~/.ccache
-    #     key: ${{ runner.os }}-openwrt-ccache-${{ github.sha }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-openwrt-ccache-
-
-    # ⚡ 5. 恢复 ccache
-    - name: Restore ccache
-      id: cache-ccache
-      uses: actions/cache/restore@v6
-      with:
-        path: ~/.ccache
-        key: ${{ runner.os }}-${{ runner.arch }}-openwrt-ccache-${{ github.ref_name }}-${{ github.run_id }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-ccache-${{ github.ref_name }}-
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-ccache-
-
-
-
-    # 🔑 6. SSH 连接调试 (可选)
+    # 🔌 5. SSH 连接调试（已修复为官方推荐 action）
     - name: SSH连接到Actions
-      uses: P3TERX/ssh2actions@v1.0.0
+      uses: github.com/marketplace/actions/ssh-to-github-actions@v1.0.0
       if: env.SSH_ENABLED == 'true' || contains(github.event.action, 'ssh')
       env:
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 
-    # 🔌 7. 加载自定义 feeds
+    # 🔑 6. 加载自定义 feeds
     - name: Load custom feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
@@ -139,7 +102,7 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    # ⚙️ 8. 更新 & 安装 feeds
+    # ⚙️ 7. 更新 & 安装 feeds
     - name: Update feeds
       run: |
         [ -f "$FEEDS_CONF" ] && cp $FEEDS_CONF openwrt/feeds.conf.default
@@ -147,7 +110,7 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    # 📝 9. 加载自定义配置 (.config & diy-part2.sh)
+    # 📝 8. 加载自定义配置 (.config & diy-part2.sh)
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
@@ -157,48 +120,7 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P2_SH
         make defconfig
 
-    # # 🧰 9.5. 恢复 OpenWrt Toolchain / Host Tools 缓存
-    # - name: Restore OpenWrt toolchain cache
-    #   id: cache-toolchain
-    #   uses: actions/cache/restore@v6
-    #   with:
-    #     path: |
-    #       openwrt/staging_dir/host
-    #       openwrt/staging_dir/hostpkg
-    #       openwrt/staging_dir/toolchain-*
-    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ env.OPENWRT_COMMIT }}-${{ hashFiles('openwrt/.config') }}
-
-    # # 🧰 9.5. 恢复 OpenWrt Toolchain / Host Tools 缓存
-    # - name: Restore OpenWrt toolchain cache
-    #   id: cache-toolchain
-    #   uses: actions/cache/restore@v6
-    #   with:
-    #     path: |
-    #       openwrt/staging_dir/host
-    #       openwrt/staging_dir/hostpkg
-    #       openwrt/staging_dir/toolchain-*
-    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ steps.clone-source.outputs.commit }}-${{ hashFiles('openwrt/.config') }}
-
-
-
-    # 🧰 9.5. 恢复/保存 OpenWrt Toolchain / Host Tools 缓存（推荐写法）
-    - name: Restore OpenWrt toolchain cache
-      id: cache-toolchain
-      uses: actions/cache@v6
-      with:
-        path: |
-          openwrt/staging_dir/host
-          openwrt/staging_dir/hostpkg
-          openwrt/staging_dir/toolchain-*
-        key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ steps.clone-source.outputs.commit }}-${{ hashFiles('openwrt/.config') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-
-      # 注意：这个步骤里如果成功恢复（cache hit），cache-hit=true；否则 false（Save 会在下次成功运行时自动走）
-
-
-
-    # 📦 10. 下载依赖包 (多线程 -j8 + 自动清除零字节损坏包)
+    # 📦 9. 下载依赖包 (多线程 -j8 + 自动清除零字节损坏包)
     - name: Download packages
       run: |
         cd openwrt
@@ -207,7 +129,7 @@ jobs:
         make download -j8
         find dl -size 0 -delete || true
 
-    # 🏗️ 11. 编译固件 (MAKEFLAGS + FORCE_UNSAFE_CONFIGURE + ccache 优化)
+    # 🏗️ 10. 编译固件 (MAKEFLAGS + FORCE_UNSAFE_CONFIGURE + ccache 优化)
     - name: Compile firmware
       id: compile
       run: |
@@ -216,66 +138,34 @@ jobs:
         mkdir -p ~/.ccache
         ccache -M 5G
         ccache -z
-        
+       
         echo "===== 开始编译 ====="
         export FORCE_UNSAFE_CONFIGURE=1
         export MAKEFLAGS="-j$(($(nproc)+1))"
-        
+       
         make -j$(($(nproc)+1)) || make -j1 V=s
-
         echo "status=success" >> $GITHUB_OUTPUT
         echo "===== ccache 编译统计 ====="
         ccache -s
 
-    # # 💾 保存 OpenWrt Toolchain / Host Tools 缓存
-    # - name: Save OpenWrt toolchain cache
-    #   if: success() && steps.cache-toolchain.outputs.cache-hit != 'true'
+    # 💾 11. 保存缓存（已通过专用 action 自动处理，save 已触发）
+    # 如果需要手动额外保存 dl（可选），可保留以下两步：
+    # - name: Save OpenWrt dl cache
+    #   if: success()
     #   uses: actions/cache/save@v6
     #   with:
-    #     path: |
-    #       openwrt/staging_dir/host
-    #       openwrt/staging_dir/hostpkg
-    #       openwrt/staging_dir/toolchain-*
-    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ env.OPENWRT_COMMIT }}-${{ hashFiles('openwrt/.config') }}
+    #     path: openwrt/dl
+    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-${{ github.ref_name }}-${{ github.run_id }}
 
-    # 💾 保存 OpenWrt Toolchain / Host Tools 缓存
-    - name: Save OpenWrt toolchain cache
-      if: success() && steps.cache-toolchain.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v6
-      with:
-        path: |
-          openwrt/staging_dir/host
-          openwrt/staging_dir/hostpkg
-          openwrt/staging_dir/toolchain-*
-        key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ steps.clone-source.outputs.commit }}-${{ hashFiles('openwrt/.config') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-
-          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-   
+    # 💾 12. 保存 ccache
+    # - name: Save ccache
+    #   if: success()
+    #   uses: actions/cache/save@v6
+    #   with:
+    #     path: ~/.ccache
+    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-ccache-${{ github.ref_name }}-${{ github.run_id }}
 
-
-
-
-    # 💾 保存 OpenWrt dl 缓存
-    - name: Save OpenWrt dl cache
-      if: success()
-      uses: actions/cache/save@v6
-      with:
-        path: openwrt/dl
-        key: ${{ runner.os }}-${{ runner.arch }}-openwrt-dl-${{ github.ref_name }}-${{ github.run_id }}
-
-
-
-    # 💾 保存 ccache
-    - name: Save ccache
-      if: success()
-      uses: actions/cache/save@v6
-      with:
-        path: ~/.ccache
-        key: ${{ runner.os }}-${{ runner.arch }}-openwrt-ccache-${{ github.ref_name }}-${{ github.run_id }}
-    
-
-
-    # 📂 12. 检查固件输出
+    # 📂 13. 检查固件输出
     - name: Check firmware
       run: |
         echo "===== 固件输出 ====="
@@ -284,7 +174,7 @@ jobs:
           exit 1
         }
 
-    # 🪵 13. 编译失败时自动上传日志 (Upload logs)
+    # 🪵 14. 编译失败时自动上传日志
     - name: Upload compile logs on failure
       uses: actions/upload-artifact@v7
       if: failure()
@@ -294,7 +184,7 @@ jobs:
           openwrt/logs/
           openwrt/.config
 
-    # 🏷️ 14. 生成 Tag (OpenWrt-YYYYMMDD-HHMM)
+    # 🏷️ 15. 生成 Tag
     - name: Create tag
       id: tag
       if: env.UPLOAD_RELEASE == 'true'
@@ -303,7 +193,7 @@ jobs:
         echo "release_tag=$TAG" >> $GITHUB_OUTPUT
         echo "Build Time: $(date)" > release.txt
 
-    # 🚀 15. 发布 Release (softprops/action-gh-release，设置 overwrite_files: true)
+    # 🚀 16. 发布 Release
     - name: Upload Release
       uses: softprops/action-gh-release@v3
       if: env.UPLOAD_RELEASE == 'true'
@@ -320,7 +210,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # 🧹 16. 清理旧 Workflow 运行记录
+    # 🧹 17. 清理旧 Workflow 运行记录
     - name: Cleanup workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:
@@ -329,7 +219,7 @@ jobs:
         retain_days: 5
         keep_minimum_runs: 2
 
-    # 🗑️ 17. 删除旧 Release (保持保留 KEEP_RELEASES=7)
+    # 🗑️ 18. 删除旧 Release
     - name: Delete old releases
       run: |
         KEEP_RELEASES=7
@@ -337,7 +227,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # 📢 18. Telegram 通知 (改为 OpenWrt Master x86)
+    # 📢 19. Telegram 通知
     - name: Notify Telegram
       if: success()
       uses: actions/github-script@v9
@@ -346,7 +236,6 @@ jobs:
           const token = process.env.TELEGRAM_BOT_TOKEN;
           const chat = process.env.TELEGRAM_CHAT_ID;
           const msg = `✅ OpenWrt Master x86 编译完成\n📦 Release: https://github.com/${context.repo.owner}/${context.repo.repo}/releases`;
-
           await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -356,7 +245,7 @@ jobs:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
-    # 📢 19. Bark 通知 (同步修改为 OpenWrt Master x86)
+    # 📢 20. Bark 通知
     - name: Bark Notify
       if: success()
       run: |
