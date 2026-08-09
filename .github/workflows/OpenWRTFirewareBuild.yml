@@ -20,9 +20,7 @@ env:
   TZ: Asia/Shanghai
   DEBIAN_FRONTEND: noninteractive
   UPLOAD_RELEASE: true
-  # 推荐的 OpenWRT 专用缓存地址（强烈推荐用于参考）
-  CACHEWRT_REF: klever1988/cachewrtbuild@main
-  # 参考仓库（源码下载地址）
+  # 推荐的 OpenWRT 专用缓存地址（社区最新）
   REF_REPO: https://github.com/openwrt/openwrt
 
 jobs:
@@ -74,7 +72,7 @@ jobs:
     # 💾 4. 专用 OpenWRT 缓存（dl + ccache + toolchain）—— 社区最成熟方案
     # 使用 klever1988/cachewrtbuild@main（已验证，命中率极高，自动处理 dl / ccache / staging_dir）
     - name: Cache OpenWrt Build
-      uses: ${{ env.CACHEWRT_REF }}
+      uses: klever1988/cachewrtbuild@main
       with:
         ccache: true
         toolchain: true
