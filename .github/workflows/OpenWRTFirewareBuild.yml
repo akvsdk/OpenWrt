@@ -168,16 +168,33 @@ jobs:
     #       openwrt/staging_dir/toolchain-*
     #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ env.OPENWRT_COMMIT }}-${{ hashFiles('openwrt/.config') }}
 
-    # 🧰 9.5. 恢复 OpenWrt Toolchain / Host Tools 缓存
+    # # 🧰 9.5. 恢复 OpenWrt Toolchain / Host Tools 缓存
+    # - name: Restore OpenWrt toolchain cache
+    #   id: cache-toolchain
+    #   uses: actions/cache/restore@v6
+    #   with:
+    #     path: |
+    #       openwrt/staging_dir/host
+    #       openwrt/staging_dir/hostpkg
+    #       openwrt/staging_dir/toolchain-*
+    #     key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ steps.clone-source.outputs.commit }}-${{ hashFiles('openwrt/.config') }}
+
+
+
+    # 🧰 9.5. 恢复/保存 OpenWrt Toolchain / Host Tools 缓存（推荐写法）
     - name: Restore OpenWrt toolchain cache
       id: cache-toolchain
-      uses: actions/cache/restore@v6
+      uses: actions/cache@v6
       with:
         path: |
           openwrt/staging_dir/host
           openwrt/staging_dir/hostpkg
           openwrt/staging_dir/toolchain-*
         key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ steps.clone-source.outputs.commit }}-${{ hashFiles('openwrt/.config') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-
+          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-
+      # 注意：这个步骤里如果成功恢复（cache hit），cache-hit=true；否则 false（Save 会在下次成功运行时自动走）
 
 
 
@@ -231,7 +248,10 @@ jobs:
           openwrt/staging_dir/hostpkg
           openwrt/staging_dir/toolchain-*
         key: ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-${{ steps.clone-source.outputs.commit }}-${{ hashFiles('openwrt/.config') }}
-    
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-
+          ${{ runner.os }}-${{ runner.arch }}-openwrt-toolchain-   
+
 
 
 
