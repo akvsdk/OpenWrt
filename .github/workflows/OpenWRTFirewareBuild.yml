@@ -84,14 +84,14 @@ jobs:
         #   openwrt/dl
         #   ~/.ccache
 
-    # 🔌 5. SSH 连接调试（已修复为官方推荐 action）
-    - name: SSH连接到Actions
-      uses: github.com/marketplace/actions/ssh-to-github-actions@v1.0.0
-      if: env.SSH_ENABLED == 'true' || contains(github.event.action, 'ssh')
-      env:
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-
+    # # 🔌 5. SSH 连接调试（已修复为官方推荐 action）
+    # - name: SSH连接到Actions
+    #   uses: github.com/marketplace/actions/ssh-to-github-actions@v1.0.0
+    #   if: env.SSH_ENABLED == 'true' || contains(github.event.action, 'ssh')
+    #   env:
+    #     TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    #     TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+# 
     # 🔑 6. 加载自定义 feeds
     - name: Load custom feeds
       run: |
