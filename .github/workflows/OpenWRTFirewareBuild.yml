@@ -22,7 +22,7 @@ env:
   UPLOAD_RELEASE: true
   # 推荐的 OpenWRT 专用缓存地址（强烈推荐用于参考）
   CACHEWRT_REF: klever1988/cachewrtbuild@main
-  # 参考仓库（很多大项目都在用这个）
+  # 参考仓库（源码下载地址）
   REF_REPO: https://github.com/openwrt/openwrt
 
 jobs:
