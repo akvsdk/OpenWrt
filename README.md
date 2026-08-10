@@ -4,7 +4,7 @@
 
 **包含软件包**：
 - BPF（内核 eBPF 支持 + BPF 工具链）
-- openssh-sftp-server=y（sftp 服务）
+- openssh-sftp-server（sftp 服务）
 - curl（命令行下载工具）
 - luci-app-statistics（流量统计与可视化）
 - wireguard（WireGuard 协议支持）
