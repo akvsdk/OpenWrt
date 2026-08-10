@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# QuickFile requires LuCI's nginx server and its locations include.
+if [ -x /usr/bin/quickfile ]; then
+    uci set nginx.global.uci_enable='true'
+    uci -q delete nginx._lan
+    uci -q delete nginx._redirect2ssl
+    uci set nginx._lan='server'
+    uci set nginx._lan.uci_manage_ssl='self-signed'
+    uci set nginx._lan.ssl_session_reuse='off'
+    uci add_list nginx._lan.listen='80 default_server'
+    uci add_list nginx._lan.listen='[::]:80 default_server'
+    uci add_list nginx._lan.include='conf.d/*.locations'
+    uci set nginx._lan.access_log='off; # logd openwrt'
+    uci commit nginx
+fi
+
+exit 0

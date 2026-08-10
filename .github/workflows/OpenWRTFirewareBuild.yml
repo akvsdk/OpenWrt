@@ -106,6 +106,7 @@ jobs:
         [ -f "$FEEDS_CONF" ] && cp $FEEDS_CONF openwrt/feeds.conf.default
         cd openwrt
         ./scripts/feeds update -a
+        ./scripts/feeds install -d y -p istore luci-app-store
         ./scripts/feeds install -a
 
     # 📝 8. 加载自定义配置 (.config & diy-part2.sh)
