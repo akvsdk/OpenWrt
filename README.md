@@ -15,3 +15,9 @@
 - luci-app-ddns-go（动态域名解析工具）
 - hev-socks5-server（高性能 SOCKS5 代理服务器）
 
+# ssh脚本使用方法
+
+```
+sudo bash setup-ssh-v4.sh --auto --disable-password --change-port=2222 --no-fail2ban #生产用法（一键安全加固）
+sudo bash setup-ssh-v4.sh #手动模式（推荐）
+```
