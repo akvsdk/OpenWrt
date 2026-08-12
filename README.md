@@ -5,11 +5,9 @@
 **包含软件包**：
 - BPF（内核 eBPF 支持 + BPF 工具链）
 - openssh-sftp-server（sftp 服务）
-- curl（命令行下载工具）
 - luci-app-statistics（流量统计与可视化）
 - wireguard（WireGuard 协议支持）
 - shairport-sync-openssl（AirPlay 接收器）
-- microsocks（轻量级 SOCKS5 代理）
 - luci-app-kixdns（KixDNS DNS 转发与加速工具）
 - luci-app-kdae（DAE 透明代理 LuCI 管理界面）
 - luci-app-ddns-go（动态域名解析工具）
